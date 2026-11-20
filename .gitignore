@@ -1,0 +1,19 @@
+data/
+saved_models/
+__pycache__/
+*.pyc
+*.pth
+*.pt
+.DS_Store
+*.egg-info/
+.venv/
+venv/
+
+# Results: keep the evaluation figures, ignore the bulky/intermediate artifacts
+results/*
+!results/confusion_*.png
+!results/per_key_accuracy_*.png
+!results/training_curves_*.png
+
+# Personal career notes, not for publication
+PROJECT_WRITEUP.md
