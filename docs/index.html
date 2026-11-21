@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Acoustic Keystroke Recovery — Reading keystrokes from sound</title>
+<meta name="description" content="A machine-learning project that recovers typed text from the sound of a keyboard. Reproduction of Harrison et al. (2023), with a live interactive demo." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#0a0b10; --bg2:#11131b; --card:#151826; --line:#242838;
+    --txt:#e9ecf5; --muted:#9aa3b8; --brand:#6ea8ff; --brand2:#9b7bff;
+    --accent:#36e0b0; --warn:#ffcf6b; --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--brand);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  section{padding:64px 0;border-top:1px solid var(--line)}
+  h1,h2,h3{line-height:1.2;margin:0 0 .4em}
+  h2{font-size:clamp(1.5rem,3vw,2.1rem);font-weight:800}
+  .eyebrow{color:var(--accent);font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;font-size:.78rem;margin-bottom:10px}
+  .muted{color:var(--muted)}
+  /* NAV */
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+    background:rgba(10,11,16,.72);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .logo{font-weight:800;font-size:1.02rem;display:flex;gap:9px;align-items:center}
+  .logo span{font-size:1.25rem}
+  .navlinks{display:flex;gap:22px;font-size:.92rem}
+  .navlinks a{color:var(--muted)}
+  .navlinks a:hover{color:var(--txt);text-decoration:none}
+  @media(max-width:720px){.navlinks{display:none}}
+  /* HERO */
+  .hero{padding:84px 0 60px;text-align:center;position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:-40% -10% auto;height:520px;
+    background:radial-gradient(60% 60% at 50% 0,rgba(110,168,255,.18),transparent 70%),
+               radial-gradient(40% 50% at 70% 10%,rgba(155,123,255,.16),transparent 70%);
+    z-index:-1}
+  .hero h1{font-size:clamp(2.1rem,5.4vw,3.6rem);font-weight:800;letter-spacing:-.02em}
+  .hero h1 .grad{background:linear-gradient(100deg,var(--brand),var(--brand2) 60%,var(--accent));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{font-size:clamp(1.05rem,2.2vw,1.3rem);color:var(--muted);
+    max-width:680px;margin:18px auto 30px}
+  .btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:12px;
+    font-weight:600;font-size:.98rem;border:1px solid transparent;cursor:pointer}
+  .btn.primary{background:linear-gradient(100deg,var(--brand),var(--brand2));color:#0a0b10}
+  .btn.primary:hover{filter:brightness(1.08);text-decoration:none}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--txt)}
+  .btn.ghost:hover{border-color:var(--brand);text-decoration:none}
+  /* STATS */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:52px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 16px}
+  .stat .n{font-size:1.8rem;font-weight:800;font-family:var(--mono);
+    background:linear-gradient(100deg,var(--brand),var(--accent));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .l{color:var(--muted);font-size:.84rem;margin-top:2px}
+  @media(max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}}
+  /* CARDS / PIPELINE */
+  .grid{display:grid;gap:18px}
+  .grid.p4{grid-template-columns:repeat(4,1fr)}
+  .grid.c2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:860px){.grid.p4{grid-template-columns:repeat(2,1fr)}.grid.c2{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .step .k{font-family:var(--mono);color:var(--brand);font-weight:700;font-size:.8rem}
+  .step h3{font-size:1.05rem;margin:8px 0 6px}
+  .step p{color:var(--muted);font-size:.92rem;margin:0}
+  .step .ico{font-size:1.7rem}
+  /* DEMO */
+  .demo-frame{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    overflow:hidden;margin-top:10px}
+  .demo-frame iframe{width:100%;height:720px;border:0;display:block;background:#fff}
+  .demo-wait{padding:60px 24px;text-align:center}
+  .demo-wait .ico{font-size:2.4rem}
+  .pill{display:inline-block;padding:4px 11px;border-radius:999px;font-size:.78rem;
+    font-weight:600;background:rgba(54,224,176,.14);color:var(--accent);
+    border:1px solid rgba(54,224,176,.3)}
+  /* RESULTS */
+  figure{margin:0;background:var(--card);border:1px solid var(--line);
+    border-radius:16px;overflow:hidden}
+  figure img{width:100%;display:block;background:#fff}
+  figcaption{padding:14px 18px;color:var(--muted);font-size:.88rem}
+  /* TECH */
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+  .chip{background:var(--bg2);border:1px solid var(--line);border-radius:999px;
+    padding:7px 14px;font-size:.86rem;color:var(--txt);font-family:var(--mono)}
+  /* ETHICS */
+  .ethics{background:linear-gradient(180deg,rgba(255,207,107,.06),transparent);
+    border:1px solid rgba(255,207,107,.25);border-radius:16px;padding:24px}
+  .ethics h2{font-size:1.3rem}
+  .ethics ul{margin:10px 0 0;padding-left:20px;color:var(--muted)}
+  .ethics li{margin:6px 0}
+  /* FOOTER */
+  footer{border-top:1px solid var(--line);padding:40px 0;color:var(--muted);font-size:.9rem}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  code.inline{font-family:var(--mono);background:var(--bg2);padding:2px 7px;
+    border-radius:6px;font-size:.85em;color:var(--accent)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="logo"><span>🎧→⌨️</span> Keystroke Recovery</div>
+    <div class="navlinks">
+      <a href="#how">How it works</a>
+      <a href="#demo">Try it live</a>
+      <a href="#results">Results</a>
+      <a href="#ethics">Ethics</a>
+      <a href="https://github.com/ALLaNRoY-TECH/Acoustic-keystroke-project">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Acoustic side-channel · machine learning</div>
+    <h1>Reading what you type<br/>from the <span class="grad">sound of your keys</span></h1>
+    <p class="lead">A neural network that listens to a keyboard and recovers the text being
+      typed — no screen capture, no keylogger, just audio. A hands-on reproduction of
+      published 2023 research, with a demo you can try right now.</p>
+    <div class="btns">
+      <a class="btn primary" href="#demo">▶ Try the live demo</a>
+      <a class="btn ghost" href="https://github.com/ALLaNRoY-TECH/Acoustic-keystroke-project">View the code on GitHub</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="n">92%</div><div class="l">per-key accuracy (test set)</div></div>
+      <div class="stat"><div class="n">100%</div><div class="l">top-5 accuracy</div></div>
+      <div class="stat"><div class="n">36</div><div class="l">keys classified (a–z, 0–9)</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">mics needed to try it</div></div>
+    </div>
+  </div>
+</header>
+
+<section id="how">
+  <div class="wrap">
+    <div class="eyebrow">How it works</div>
+    <h2>From a sound wave to a sentence</h2>
+    <p class="muted" style="max-width:720px">Every key makes a slightly different click. The
+      pipeline turns that audio into a picture of its frequencies, and a small neural network
+      learns to tell the keys apart — then a dictionary cleans up the guesses.</p>
+    <div class="grid p4" style="margin-top:26px">
+      <div class="card step"><div class="ico">🎙️</div><div class="k">STEP 1</div>
+        <h3>Listen &amp; split</h3><p>Detect each individual keystroke in the recording by its
+        sharp onset, and cut a short clip around every press.</p></div>
+      <div class="card step"><div class="ico">🌈</div><div class="k">STEP 2</div>
+        <h3>See the sound</h3><p>Convert each clip into a mel-spectrogram — a heat-map image of
+        which frequencies fired and when.</p></div>
+      <div class="card step"><div class="ico">🧠</div><div class="k">STEP 3</div>
+        <h3>Classify</h3><p>A convolutional neural network looks at each spectrogram image and
+        predicts which of the 36 keys it was.</p></div>
+      <div class="card step"><div class="ico">📖</div><div class="k">STEP 4</div>
+        <h3>Correct</h3><p>A dictionary "noisy-channel" decoder fixes shaky letters by snapping
+        the sequence to the most likely real word.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="wrap">
+    <div class="eyebrow">Try it live</div>
+    <h2>Type a word — watch the model recover it 🎯</h2>
+    <p class="muted" style="max-width:720px">The demo below runs the <em>real trained model</em>.
+      Type any word; it synthesises the sound of that word being typed, then recovers the letters
+      from the audio alone. No microphone required.</p>
+    <div class="demo-frame" id="demoFrame">
+      <!-- When the Hugging Face Space is live, its URL goes in SPACE_URL below and this becomes a live iframe. -->
+      <div class="demo-wait" id="demoWait">
+        <div class="ico">🚀</div>
+        <p style="margin:14px 0 6px"><span class="pill">Live demo coming online</span></p>
+        <p class="muted" style="max-width:520px;margin:10px auto 18px">The interactive model is
+          being deployed to a free hosting page. Once it's live it will appear right here. In the
+          meantime, the full code runs locally in seconds — see the GitHub repo.</p>
+        <a class="btn ghost" href="https://github.com/ALLaNRoY-TECH/Acoustic-keystroke-project#-quick-start-no-microphone">How to run it yourself ↗</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <div class="eyebrow">Results</div>
+    <h2>It actually works — here's the proof</h2>
+    <p class="muted" style="max-width:720px">Trained and evaluated on held-out data. These are the
+      real charts the training run produced. (Figures are on the project's synthetic benchmark,
+      which proves the pipeline end-to-end; real-world accuracy depends on the keyboard and room.)</p>
+    <div class="grid c2" style="margin-top:26px">
+      <figure><img src="assets/training_curves_baseline.png" alt="Training and validation accuracy curves"/>
+        <figcaption><b>Learning curve.</b> Accuracy climbs to ~94% on validation as training
+        progresses — the model is genuinely learning, not memorising.</figcaption></figure>
+      <figure><img src="assets/per_key_accuracy_baseline.png" alt="Per-key accuracy bar chart"/>
+        <figcaption><b>Per-key accuracy.</b> How reliably each individual key is recognised across
+        all 36 classes.</figcaption></figure>
+      <figure><img src="assets/confusion_baseline.png" alt="Confusion matrix"/>
+        <figcaption><b>Confusion matrix.</b> A bright diagonal means predictions match the true
+        key; off-diagonal spots show the rare mix-ups.</figcaption></figure>
+      <figure><img src="assets/diag_spectrograms.png" alt="Example mel-spectrograms of keystrokes"/>
+        <figcaption><b>What the model sees.</b> Example mel-spectrograms — each key leaves a
+        distinct fingerprint in frequency and time.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="tech">
+  <div class="wrap">
+    <div class="eyebrow">Under the hood</div>
+    <h2>Built with</h2>
+    <div class="chips">
+      <span class="chip">Python</span><span class="chip">PyTorch</span>
+      <span class="chip">librosa</span><span class="chip">NumPy</span>
+      <span class="chip">CNN classifier</span><span class="chip">CoAtNet</span>
+      <span class="chip">mel-spectrograms</span><span class="chip">SpecAugment</span>
+      <span class="chip">noisy-channel decoding</span><span class="chip">Gradio</span>
+      <span class="chip">scikit-learn</span><span class="chip">soundfile</span>
+    </div>
+    <p class="muted" style="margin-top:22px">Two models are included: a fast lightweight CNN
+      baseline and a pure-PyTorch <code class="inline">NativeCoAtNet</code> hybrid that runs without
+      extra dependencies. The whole <code class="inline">train → evaluate → demo</code> pipeline runs
+      with no hardware thanks to a built-in synthetic data generator.</p>
+  </div>
+</section>
+
+<section id="ethics">
+  <div class="wrap">
+    <div class="ethics">
+      <h2>⚖️ Ethics &amp; responsible use</h2>
+      <p class="muted">This project exists to <b>understand and defend against</b> a real security
+        risk — it is a reproduction of peer-reviewed research, for education and awareness.</p>
+      <ul>
+        <li><b>Authorised use only.</b> Only ever record your own typing, or audio from people who
+          have explicitly consented.</li>
+        <li><b>No unauthorised surveillance.</b> Do not use this to capture anyone's keystrokes
+          without their knowledge and permission — doing so may be illegal.</li>
+        <li><b>Awareness, not attack.</b> The goal is to show that keyboard audio can leak
+          information, so people can take precautions.</li>
+        <li>Provided "as is" with no warranty; the author accepts no liability for misuse. See the
+          <a href="https://github.com/ALLaNRoY-TECH/Acoustic-keystroke-project#️-legal--ethical-use">full terms</a>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>Built by <b>Allan Roy</b> · reproduction of Harrison et al., IEEE EuroS&amp;PW 2023.</div>
+    <div><a href="https://github.com/ALLaNRoY-TECH/Acoustic-keystroke-project">GitHub repository ↗</a></div>
+  </div>
+</footer>
+
+<script>
+  // ── Live demo wiring ────────────────────────────────────────────────────────
+  // After you create the Hugging Face Space, put its embed URL here, e.g.
+  //   const SPACE_URL = "https://allanroy-tech-keystroke-recovery.hf.space";
+  const SPACE_URL = "";
+  if (SPACE_URL) {
+    const frame = document.getElementById('demoFrame');
+    frame.innerHTML =
+      '<iframe src="' + SPACE_URL + '" title="Live keystroke recovery demo" ' +
+      'allow="microphone" loading="lazy"></iframe>';
+  }
+</script>
+</body>
+</html>

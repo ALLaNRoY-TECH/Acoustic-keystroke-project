@@ -12,6 +12,20 @@ It runs the full loop: record → cut each keystroke out of the audio → turn i
 
 ---
 
+## 🌐 Live demo &amp; website
+
+- **🖥️ Project website:** https://allanroy-tech.github.io/Acoustic-keystroke-project/
+- **▶️ Try it live (interactive):** type a word and watch the trained model recover it from the sound — right in your browser, no setup. The live model is served from a Gradio app (see [`hf_space/`](hf_space/) and its [`DEPLOY.md`](hf_space/DEPLOY.md)) and embedded in the website.
+
+You can also run the same web app locally:
+
+```bash
+pip install gradio
+python app.py        # then open http://127.0.0.1:7860
+```
+
+---
+
 ## 📑 Table of contents
 
 - [How I got the idea](#-how-i-got-the-idea)
