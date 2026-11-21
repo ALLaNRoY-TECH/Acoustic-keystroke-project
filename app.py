@@ -23,7 +23,11 @@ import tempfile
 # the Space fails to start. Locally (no `spaces` package) this is a harmless no-op.
 try:
     import spaces
-    gpu = spaces.GPU
+
+    def gpu(fn):
+        # The model needs ~1s, so reserve only 3s of the (tiny) free quota
+        # instead of the 60s default — this multiplies runs per visitor.
+        return spaces.GPU(duration=3)(fn)
 except Exception:
     def gpu(fn):
         return fn
