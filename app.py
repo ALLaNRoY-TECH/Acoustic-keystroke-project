@@ -19,6 +19,15 @@ Then open the printed http://127.0.0.1:7860 URL.
 
 import tempfile
 
+# On Hugging Face "ZeroGPU" Spaces, a function must be wrapped with @spaces.GPU or
+# the Space fails to start. Locally (no `spaces` package) this is a harmless no-op.
+try:
+    import spaces
+    gpu = spaces.GPU
+except Exception:
+    def gpu(fn):
+        return fn
+
 import numpy as np
 import soundfile as sf
 import gradio as gr
@@ -107,6 +116,7 @@ def _run_model_on_wav(wav_path):
 
 
 # ── Tab 1: type a word ──────────────────────────────────────────────────────────
+@gpu
 def demo_typed(word):
     try:
         sr, buf = synth_phrase_buffer(word)
@@ -120,6 +130,7 @@ def demo_typed(word):
 
 
 # ── Tab 2: upload audio ─────────────────────────────────────────────────────────
+@gpu
 def demo_uploaded(audio_path):
     if not audio_path:
         return "—", "Please upload or record a .wav file first.", ""
